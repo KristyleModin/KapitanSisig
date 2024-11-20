@@ -159,44 +159,52 @@ function jsonResponse($status, $status_type, $message ){
     echo json_encode($response);
     return;
 }
-
+  
 function logoutSession() {
     unset($_SESSION['loggedIn']);
     unset($_SESSION['loggedInUser']);
 }
 
 function getIngredientQuantity($ingredient_id) {
-    global $db;
+    global $conn;
 
     $query = "SELECT quantity FROM ingredients WHERE id = ?";
-    $stmt = $db->prepare($query);
-    $stmt->execute([$ingredient_id]);
-
-    $ingredient = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("i", $ingredient_id); // 'i' indicates integer
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $ingredient = $result->fetch_assoc();
     return $ingredient ? $ingredient['quantity'] : 0;  // Return the quantity or 0 if not found
 }
 
+
 // Function to get recipe by product ID
 function getRecipeByProductId($product_id) {
-    global $db;
+    global $conn;
 
     $query = "SELECT * FROM recipes WHERE product_id = ?";
-    $stmt = $db->prepare($query);
-    $stmt->execute([$product_id]);
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("i", $product_id); // 'i' indicates integer
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-    return $stmt->fetch(PDO::FETCH_ASSOC);
+    return $result->fetch_assoc(); // Fetch one record
 }
 
 // Function to get all ingredients for a recipe
 function getRecipeIngredients($recipe_id) {
-    global $db;
+    global $conn;
 
     $query = "SELECT * FROM recipe_ingredients WHERE recipe_id = ?";
-    $stmt = $db->prepare($query);
-    $stmt->execute([$recipe_id]);
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("i", $recipe_id); // 'i' indicates integer
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);  // Return all ingredients for this recipe
+    return $result->fetch_all(MYSQLI_ASSOC); // Fetch all rows as an associative array
 }
+
 
 // Function to calculate available product quantity based on ingredients
 function calculateProductQuantity($product_id) {
@@ -233,5 +241,4 @@ function calculateProductQuantity($product_id) {
 
     return $min_available_quantity;
 }
-  
 ?>
