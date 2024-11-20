@@ -236,25 +236,24 @@ if (isset($_POST['updateSupplierIngredient'])) {
         }
     }
 
-    // Update existing ingredient information
-    if (!empty($_POST['ingredient_id'])) {
-        foreach ($_POST['ingredient_id'] as $key => $ingredientId) {
-            $ingredientId = intval($ingredientId);
-            $unitId = intval($_POST['unit_id'][$key]);
-            $price = floatval($_POST['price'][$key]);
+   // Update existing ingredient information
+   if (!empty($_POST['ingredient_id'])) {
+    foreach ($_POST['ingredient_id'] as $key => $ingredientId) {
+        $ingredientId = intval($ingredientId);
+        $unitId = intval($_POST['unit_id'][$key]);
+        $price = floatval($_POST['price'][$key]);
 
             // Ensure the ingredient is not marked for deletion before updating
             if (!in_array($ingredientId, $_POST['delete_ingredient'] ?? [])) {
                 $updateQuery = "
-                    UPDATE supplier_ingredients 
+                        UPDATE supplier_ingredients 
                     SET unit_id = $unitId, price = $price 
                     WHERE id = $ingredientId AND supplier_id = $supplierId
                 ";
                 mysqli_query($conn, $updateQuery);
+                    }
+                }
             }
-        }
-    }
-
     // Handle adding new ingredients
     if (!empty($_POST['new_ingredient_id'])) {
         foreach ($_POST['new_ingredient_id'] as $key => $newIngredientId) {
@@ -269,23 +268,24 @@ if (isset($_POST['updateSupplierIngredient'])) {
                     VALUES ($supplierId, $newIngredientId, $newUnitId, $newPrice)
                 ";
                 mysqli_query($conn, $insertQuery);
-            }
         }
-    }
-
     // Redirect back to the supplier ingredients page after the operation
     header('Location: suppliers-ingredient-view.php?id=' . urlencode($supplierId));
     exit;
 }
+    }
+}
+
 
 //Save Ingredient
 if (isset($_POST['saveIngredient'])) {
     $name = $_POST['name'];
     $unit_id = $_POST['unit_id'];
     $category = $_POST['category'];
+    $quantity = 0;
 
-    $query = "INSERT INTO ingredients (name, unit_id, category) 
-              VALUES ('$name', '$unit_id', '$category')";
+    $query = "INSERT INTO ingredients (name, unit_id, category, quantity) 
+              VALUES ('$name', '$unit_id', '$category', '$quantity')";
     
     if (mysqli_query($conn, $query)) {
         $_SESSION['message'] = "Ingredient added successfully";
@@ -297,6 +297,7 @@ if (isset($_POST['saveIngredient'])) {
         exit(0);
     }
 }
+
 // Update Ingredient
 if (isset($_POST['updateIngredient'])) {
     $ingredientId = trim($_POST['ingredientId']);
@@ -308,13 +309,15 @@ if (isset($_POST['updateIngredient'])) {
     // Allow unit_id to be nullable
     $unit_id = isset($_POST['unit_id']) && !empty($_POST['unit_id']) ? trim($_POST['unit_id']) : null;
 
+    $reorder_point = isset($_POST['reorder_point']) && !empty($_POST['reorder_point']) !== '' ? trim($_POST['reorder_point']) : 0;
+
     // Prepare the SQL query with placeholders
-    $query = "UPDATE ingredients SET name=?, unit_id=?, category=?, price=?, quantity=? WHERE id=?";
+    $query = "UPDATE ingredients SET name=?, unit_id=?, category=?, quantity=?, reorder_point=? WHERE id=?";
 
     // Initialize the prepared statement
     if ($stmt = mysqli_prepare($conn, $query)) {
         // Bind parameters to the placeholders
-        mysqli_stmt_bind_param($stmt, "sissi", $name, $unit_id, $category, $quantity, $ingredientId);
+        mysqli_stmt_bind_param($stmt, "sisddi", $name, $unit_id, $category, $quantity, $reorder_point, $ingredientId);
 
         // Execute the statement
         if (mysqli_stmt_execute($stmt)) {
@@ -409,54 +412,13 @@ if (isset($_POST['updateCategory'])) {
 
 
 // Save Product
-// if (isset($_POST['saveProduct'])) {
-//     $category_id = validate($_POST['category_id']);
-//     $productname = validate($_POST['productname']);
-//     $description = validate($_POST['description']);
-//     $quantity = validate($_POST['quantity']);  // Corrected quantity validation
-//     $price = validate($_POST['price']);
-
-//     if ($_FILES['image']['size'] > 0) {
-//         $path = "../pics/uploads/products";
-//         $image_ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
-
-//         $filename = time() . '.' . $image_ext;
-
-//         move_uploaded_file($_FILES['image']['tmp_name'], $path . "/" . $filename);
-//         $finalImage = "pics/uploads/products/" . $filename;
-//     } else {
-//         $finalImage = '';
-//     }
-
-//     $data = [
-//         'category_id' => $category_id,
-//         'productname' => $productname,
-//         'description' => $description,
-//         'quantity' => $quantity,  // Added quantity to the data array
-//         'price' => $price,
-//         'image' => $finalImage
-//     ];
-
-//     $result = insert('products', $data);
-//     if ($result) {
-//         redirect('products.php', 'Menu product created successfully!');
-//     } else {
-//         redirect('products-create.php', 'Something went wrong.');
-//     }
-// }
-
 if (isset($_POST['saveProduct'])) {
     $category_id = validate($_POST['category_id']);
     $productname = validate($_POST['productname']);
     $description = validate($_POST['description']);
 
-    // Here, no need for 'product_id' as it's for new products
-    $quantity = 0; // Default quantity, can be set based on logic for recipes or just zero initially
+    $quantity = 0; 
     if ($productname && $category_id) {
-        // Use the calculateProductQuantity function here if you have product and ingredients data after creation
-        // $quantity = calculateProductQuantity($product_id); // Only after product is created
-
-        // Calculate the price and handle the image upload
         $price = validate($_POST['price']);
 
         if ($_FILES['image']['size'] > 0) {
@@ -486,6 +448,7 @@ if (isset($_POST['saveProduct'])) {
         }
     }
 }
+
 
 // Update Product
 if (isset($_POST['updateProduct'])) {
@@ -964,7 +927,7 @@ if(isset($_POST['addIngredient'])){
         if(mysqli_num_rows($checkIngredient) > 0){
             $row = mysqli_fetch_assoc($checkIngredient); // Fetch the ingredient details
             if($row['quantity'] < $quantity){
-                redirect('stock-out.php', 'Only ' .$row['quantity']. ' ' .$row['productname']. ' available.');
+                redirect('stock-out-create.php', 'Only ' .$row['quantity']. ' ' .$row['productname']. ' available.');
             }
 
             $ingredientData = [
@@ -986,7 +949,7 @@ if(isset($_POST['addIngredient'])){
                     $newQuantity = $ingSessionItem['quantity'] + $quantity;
                     if($ingSessionItem['ingredient_id'] == $row['id']){
                         if($row['quantity'] < $newQuantity){ //if available is less than order
-                            redirect('stock-out.php', 'Only ' .$row['quantity']. ' ' .$row['productname']. ' available.');
+                            redirect('stock-out-create.php', 'Only ' .$row['quantity']. ' ' .$row['productname']. ' available.');
                         } else {
                             $ingredientData = [
                                 'ingredient_id' => $row['id'],
@@ -1011,141 +974,5 @@ if(isset($_POST['addIngredient'])){
         redirect('stock-out-create.php', 'Something went wrong!');
     }
 }
-
-// if (isset($_POST['proceedToPlaceSoBtn'])) {
-//     $reason = validate($_POST['reason']);
-
-//     $checkCustomer = mysqli_query($conn, "SELECT * FROM customers WHERE name='$name' LIMIT 1");
-
-//     if ($checkCustomer) {
-//         if (mysqli_num_rows($checkCustomer) > 0) {
-//             $_SESSION['invoice_no'] = "INV-" .rand(111111, 999999);
-//             $_SESSION['cname'] = $name;
-//             $_SESSION['payment_mode'] = $payment_mode;
-//             $_SESSION['order_status'] = $order_status;
-
-//             jsonResponse(200, 'success', 'Customer found');
-//         } else {
-//             $_SESSION['cname'] = $name;
-//             jsonResponse(404, 'warning', 'Customer not found');
-//         }
-//     } else {
-//         jsonResponse(500, 'error', 'Something Went Wrong');
-//     }
-// }
-
-// // Function to get UoM ratio by unit_id
-// function getUomRatio($conn, $unit_id) {
-//     $query = "SELECT ratio FROM units_of_measure WHERE id = ?";
-//     $stmt = $conn->prepare($query);
-//     $stmt->bind_param("i", $unit_id);
-//     $stmt->execute();
-//     $result = $stmt->get_result()->fetch_assoc();
-//     return $result ? $result['ratio'] : null; // Return the ratio or null
-// }
-
-// Update Ingredient Inventory Function
-// function updateIngredientInventory($conn, $productId, $quantity) {
-//     // Fetch the recipe's ingredient details
-//     $recipeQuery = "SELECT ri.ingredient_id, ri.unit_id, ri.quantity as recipe_quantity, i.unit_id as ingredient_unit_id 
-//                     FROM recipe_ingredients ri 
-//                     JOIN ingredients i ON ri.ingredient_id = i.id 
-//                     WHERE ri.recipe_id = ?";
-    
-//     $stmt = $conn->prepare($recipeQuery);
-//     $stmt->bind_param("i", $productId);
-//     $stmt->execute();
-//     $ingredients = $stmt->get_result();
-
-//     // Loop through each ingredient and adjust the inventory
-//     while ($ingredient = $ingredients->fetch_assoc()) {
-//         $ingredientId = $ingredient['ingredient_id'];
-//         $ingredientUomId = $ingredient['ingredient_unit_id'];
-//         $recipeUomId = $ingredient['unit_id'];
-//         $recipeQuantity = $ingredient['recipe_quantity'];
-
-//         // Get the ratios
-//         $ingredientRatio = getUomRatio($conn, $ingredientUomId);
-//         $recipeRatio = getUomRatio($conn, $recipeUomId);
-
-//         if ($ingredientRatio && $recipeRatio) {
-//             // Convert the recipe quantity to the ingredient's base unit
-//             $convertedQuantity = ($recipeQuantity * $recipeRatio) / $ingredientRatio;
-
-//             // Update the inventory
-//             $updateQuery = "UPDATE ingredients SET quantity = quantity - ? WHERE id = ?";
-//             $updateStmt = $conn->prepare($updateQuery);
-//             $updateStmt->bind_param("di", $convertedQuantity, $ingredientId);
-//             $updateStmt->execute();
-//         }
-//     }
-// }
-
-// Check if the addItem button was clicked
-// if (isset($_POST['addItem'])) {
-//     $productId = $_POST['product_id'];
-//     $quantity = $_POST['quantity'];
-
-//     // Fetch product details
-//     $productQuery = "SELECT * FROM products WHERE id = ?";
-//     $stmt = $conn->prepare($productQuery);
-//     $stmt->bind_param("i", $productId);
-//     $stmt->execute();
-//     $product = $stmt->get_result()->fetch_assoc();
-
-//     if ($product) {
-//         $item = [
-//             'product_id' => $product['id'],
-//             'name' => $product['productname'],
-//             'price' => $product['price'],
-//             'quantity' => $quantity
-//         ];
-
-//         // Store the item in the session
-//         $_SESSION['productItems'][] = $item;
-
-//         // Update inventory based on ingredients
-//         updateIngredientInventory($conn, $productId, $quantity);
-
-//         $_SESSION['message'] = "Item added successfully!";
-//     } else {
-//         $_SESSION['error'] = "Product not found!";
-//     }
-
-//     header("Location: order-create.php");
-//     exit();
-// }
-
-// // Place the order
-// if (isset($_POST['placeOrder'])) {
-//     $customerName = $_POST['cname'];
-//     $paymentMode = $_POST['payment_mode'];
-//     $orderStatus = $_POST['order_status'];
-
-//     // Insert order into the database
-//     $orderQuery = "INSERT INTO orders (customer_name, payment_mode, order_status) VALUES (?, ?, ?)";
-//     $stmt = $conn->prepare($orderQuery);
-//     $stmt->bind_param("sss", $customerName, $paymentMode, $orderStatus);
-//     $stmt->execute();
-//     $orderId = $stmt->insert_id; // Get the last inserted order ID
-
-//     // Loop through items and add them to the order_items table
-//     foreach ($_SESSION['productItems'] as $item) {
-//         $orderItemQuery = "INSERT INTO order_items (order_id, product_id, quantity) VALUES (?, ?, ?)";
-//         $orderItemStmt = $conn->prepare($orderItemQuery);
-//         $orderItemStmt->bind_param("iii", $orderId, $item['product_id'], $item['quantity']);
-//         $orderItemStmt->execute();
-
-//         // Update ingredient inventory based on the recipe
-//         updateIngredientInventory($conn, $item['product_id'], $item['quantity']);
-//     }
-
-//     // Clear the session after placing the order
-//     unset($_SESSION['productItems']);
-
-//     $_SESSION['message'] = "Order placed successfully!";
-//     header("Location: orders.php");
-//     exit();
-// }
 
 ?>
